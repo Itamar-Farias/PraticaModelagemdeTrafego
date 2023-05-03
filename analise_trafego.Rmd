@@ -1,0 +1,132 @@
+---
+title: "Analise Trafego"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+#knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(ggplot2)
+library(MASS)
+library(fitdistrplus)
+
+```
+
+# Informacoes Gerais sobre a Captura
+
+```{r echo=TRUE}
+#Não mostrando esse código na saída por conta do echo=FALSE: https://vanderleidebastiani.github.io/tutoriais/Documentacao_de_resultados_usando_R_Markdown.html
+dados_usuario <- read.table("captura.dat", encoding = "UTF-8")
+print(dados_usuario)
+
+
+#Renomeando colunas de bits
+dados_usuario <- rename(dados_usuario, tempo = V1, num_pac = V2, tam_med_pac = V3, bytes = V4)
+
+
+#Marcando linhas: total de tempo (30 min e 60 min) de cada arquivo leva a aprox. 25 linhas para cada segundo e depois considerando agrupamento a cada 5 segundos
+tempo <- rep(1:360, each=125)
+#dados_usuario$tempo <- tempo[c(-length(tempo), -(length(tempo)-1))]
+
+#Criar data.frame
+dados <- data.frame(tempo = dados_usuario$tempo[1:414], usuario_B = dados_usuario$bytes)
+
+nrow(dados_usuario)
+
+
+# Analise de Bytes
+
+summary(dados$usuario_B)
+
+#Intervalo de confianca para midia de pacotes
+error <- qnorm(0.95)*sd(dados$usuario_B)/sqrt(nrow(dados))
+left <- mean(dados$usuario_B) - error
+right <- mean(dados$usuario_B) + error
+cat("Intervalo de confianca Usuario - 95%\n")
+cat("[", left, ",", right, "]")
+
+#Histograma
+ggplot(data=dados, aes(dados$usuario, fill="red")) + geom_histogram() + xlab("Bytes") + ylab("Frequencia") + ggtitle("Usuario") + theme_bw()
+
+#Scatterplot
+ggplot(data=dados, aes(x=tempo)) + geom_line(aes(y=usuario_B, colour="Usuario")) + geom_line(aes(y=usuario_B, colour="Total")) + xlab("Tempo") + ylab("Bytes") + theme_bw()
+
+#Ajustes de distribuicoes
+plot(density(dados$usuario_B), main="Densidade")
+plot(ecdf(dados$usuario_B), main="Empirical cumulative distribution function")
+fit_norm <- fitdistrplus::fitdist(dados$usuario_B, "norm")
+#ks_norm <- ks.test(dados$usuario_B, y="pnorm", mean(fit_norm), sd(fit_norm)$estimate)
+```
+
+# Analise de Pacotes Para Trafego do Usuario
+
+Numero de pacotes
+
+```{r}
+summary(dados_usuario$tam_med_pac)
+summary(dados_usuario$num_pac)
+
+#Intervalo de confianca para media de pacotes
+error <- qnorm(0.95)*sd(dados_usuario$num_pac)/sqrt(nrow(dados_usuario))
+left <- mean(dados_usuario$num_pac) - error
+right <- mean(dados_usuario$num_pac) + error
+
+cat("Intervalo de confianca - 95%\n")
+cat("[", left, ",", right, "]")
+
+#Histograma
+hist(dados_usuario$num_pac)
+ggplot(data=dados_usuario, aes(num_pac, fill="red")) + geom_histogram() + xlab("Pacotes") + ylab("Frequencia") + theme_bw()
+
+#Scatterplot
+ggplot(data=dados_usuario, aes(x=tempo, y=num_pac, color="red")) + geom_line() + xlab("Tempo") + ylab("Pacotes") + theme_bw()
+
+#Ajustes de distribuicoes
+plot(density(dados_usuario$num_pac), main="Densidade")
+plot(ecdf(dados_usuario$num_pac), main="Empirical cumulative distribution function")
+
+fitdistr(x = dados_usuario$num_pac, densfun = "normal")
+ks.test(dados_usuario$num_pac,  y = "pnorm",  mean = 13521.6420,  sd = 11132.0004)
+
+fitdistr(x = dados_usuario$num_pac, densfun = "negative binomial")
+ks.test(dados_usuario$num_pac,  y = "pnbinom",  size = 5.694425e-01,  mu = 1.352164e+04)
+
+```
+
+Tamanho medio dos pacotes
+
+```{r}
+summary(dados_usuario$tam_med_pac)
+
+#Intervalo de confianca para media de pacotes
+error <- qnorm(0.95)*sd(dados_usuario$tam_med_pac)/sqrt(nrow(dados_usuario))
+left <- mean(dados_usuario$tam_med_pac) - error
+right <- mean(dados_usuario$tam_med_pac) + error
+
+cat("Intervalo de confian?a - 95%\n")
+cat("[", left, ",", right, "]")
+
+#Histograma
+hist(dados_usuario$tam_med_pac)
+ggplot(data=dados_usuario, aes(tam_med_pac, fill="red")) + geom_histogram() + xlab("Pacotes") + ylab("Frequencia") + theme_bw()
+
+#Scatterplot
+ggplot(data=dados_usuario, aes(x=tempo, y=tam_med_pac, color="red")) + geom_line() + xlab("Tempo") + ylab("Pacotes") + theme_bw()
+
+#Ajustes de distribuicoes
+plot(density(dados_usuario$tam_med_pac), main="Densidade")
+plot(ecdf(dados_usuario$tam_med_pac), main="Empirical cumulative distribution function")
+
+fitdistr(x = dados_usuario$tam_med_pac, densfun = "normal")
+ks.test(dados_usuario$tam_med_pac,  y = "pnorm",  mean = 13521.6420,  sd = 11132.0004)
+
+fitdistr(x = dados_usuario$tam_med_pac, densfun = "exponential")
+ks.test(dados_usuario$num_pac,  y = "pexp",  rate=1.248837e-03)
+
+#fitdistr(x = dados_usuario$tam_med_pac, densfun = "beta", start = list(shape1 = 900, shape2 = 1100))
+#ks.test(dados_usuario$num_pac,  y = "pweibull",  shape=3.23372, scale=887.330796)
+
+```
